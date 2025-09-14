@@ -8,7 +8,7 @@ mw.hook('wikipage.content').add(function () {
   var base = path;
   var langs = ['pt', 'en', 'es'];
 
-  // Detecta o idioma atual com base no sufixo
+  // Detecta idioma pelo sufixo
   langs.forEach(function (lang) {
     var suffix = '/' + lang;
     if (path.toLowerCase().endsWith(suffix)) {
@@ -18,50 +18,40 @@ mw.hook('wikipage.content').add(function () {
     }
   });
 
-  // Links e rótulos dos idiomas
-  var links = {};
+  // Se não detectou idioma → assume inglês (default)
+  if (!currentLang) currentLang = 'en';
+
+  // Labels e links
   var labels = {
     'pt': 'Português',
     'en': 'English',
     'es': 'Español'
   };
 
-  // --- ALTERAÇÃO 1: Definir links de forma mais robusta ---
-  // Se a página atual é uma das páginas principais (Main_Page ou Página_principal),
-  // os links do menu devem apontar explicitamente para as suas versões principais.
+  var links = {};
   if (base === 'Main_Page' || base === 'Página_principal') {
     links = {
-      'pt': 'Página_principal', // Link para a página principal em português
-      'en': 'Main_Page/en',    // Link para a página principal em inglês
-      'es': 'Main_Page/es'     // Link para a página principal em espanhol
+      'pt': 'Página_principal/pt',
+      'en': 'Main_Page',     // inglês é base
+      'es': 'Main_Page/es'
     };
   } else {
-    // Para páginas regulares, adiciona/remove o sufixo de idioma
     links = {
-      'pt': base,           // Português (sem sufixo)
-      'en': base + '/en',
+      'pt': base + '/pt',
+      'en': base,            // inglês é sem sufixo
       'es': base + '/es'
     };
   }
-  // --- FIM DA ALTERAÇÃO 1 ---
 
-  // Preenche o menu
+  // Monta menu de idiomas
   function insertContent(id, lang) {
     var el = document.getElementById(id);
-    if (!el) {
-      console.warn("[Language Menu] Element not found:", id);
-      return;
-    }
+    if (!el) return;
 
-    // Se está na versão "sem idioma", trata como "pt"
-    var effectiveLang = currentLang || 'pt';
-
-    if (lang === effectiveLang) {
+    if (lang === currentLang) {
       el.textContent = labels[lang];
     } else {
-      // --- ALTERAÇÃO 2: Adicionar classe para excluir da reescrita ---
       el.innerHTML = '<a class="lang-menu-link" href="' + mw.util.getUrl(links[lang]) + '">' + labels[lang] + '</a>';
-      // --- FIM DA ALTERAÇÃO 2 ---
     }
   }
 
@@ -69,59 +59,31 @@ mw.hook('wikipage.content').add(function () {
   insertContent("link-en", "en");
   insertContent("link-es", "es");
 
-  // 🌀 Reescreve os links internos somente se o idioma for reconhecido
-  if (langs.includes(currentLang) && base !== path) {
-    console.log("[Language Menu] Rewriting internal links for:", currentLang);
+  // 🌀 Reescreve links do conteúdo
+  console.log("[Language Menu] Rewriting content links for:", currentLang);
 
-    // --- ALTERAÇÃO 3: Excluir links com a classe 'lang-menu-link' ---
-    document.querySelectorAll('a[href^="/wiki/"]:not(.lang-menu-link)').forEach(function (link) {
-    // --- FIM DA ALTERAÇÃO 3 ---
-      var href = link.getAttribute('href');
-      if (!href) return;
+  document.querySelectorAll('#mw-content-text a[href^="/"]').forEach(function (link) {
+    if (link.classList.contains('lang-menu-link')) return; // ignora menu de idiomas
 
-      // Remove barra final e decodifica
-      var hrefNormalized = decodeURIComponent(href.replace(/\/$/, ''));
+    var href = link.getAttribute('href');
+    if (!href) return;
 
-      // Ignora links com parâmetros, âncoras ou namespaces especiais
-      if (href.includes('?') || href.includes('#')) return;
-      if (hrefNormalized.match(/\/wiki\/(Special:|File:|Category:|Help:|MediaWiki:)/)) return;
+    var hrefNormalized = decodeURIComponent(href.replace(/\/$/, ''));
 
-      // Tratamento especial para Main_Page e Página_principal
-      // Esta lógica é para links DENTRO do conteúdo da página, não os do menu.
-      if (hrefNormalized === '/wiki/Main_Page') {
-        if (currentLang === 'en') {
-          link.setAttribute('href', '/wiki/Main_Page/en');
-          console.log("[Language Menu] Main_Page → Main_Page/en");
-        } else {
-          link.setAttribute('href', '/wiki/Página_principal'); // Removido o '/' final desnecessário
-          console.log("[Language Menu] Main_Page → Página_principal");
-        }
-        return;
-      }
+    // Ignora âncoras e parâmetros
+    if (href.includes('?') || href.includes('#')) return;
 
-      if (hrefNormalized === '/wiki/Página_principal') {
-        if (currentLang === 'en') {
-          link.setAttribute('href', '/wiki/Main_Page/en');
-          console.log("[Language Menu] Página_principal → Main_Page/en");
-        } else {
-          link.setAttribute('href', '/wiki/Página_principal'); // Removido o '/' final desnecessário
-          console.log("[Language Menu] Página_principal → Página_principal");
-        }
-        return;
-      }
+    // Ignora namespaces especiais
+    if (hrefNormalized.match(/\/(Special:|File:|Category:|Help:|MediaWiki:)/)) return;
 
-      // Ignora se já tem idioma
-      if (hrefNormalized.match(/\/(pt|en|es)$/)) return;
+    // Ignora se já tem idioma
+    if (hrefNormalized.match(/\/(pt|en|es)$/)) return;
 
-      // Ignora se o link é para a própria página base sem idioma
-      if (hrefNormalized === '/wiki/' + base) return;
-
-      // Adiciona idioma ao final
-      var newHref = href + '/' + currentLang;
+    // Adiciona idioma se não for inglês
+    if (currentLang !== 'en') {
+      var newHref = hrefNormalized + '/' + currentLang;
       link.setAttribute('href', newHref);
       console.log("[Language Menu] Link modificado:", href, "→", newHref);
-    });
-  } else {
-    console.log("[Language Menu] Nenhum idioma detectado — links não modificados.");
-  }
+    }
+  });
 });
