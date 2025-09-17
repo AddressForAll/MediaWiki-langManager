@@ -62,7 +62,8 @@ mw.hook('wikipage.content').add(function () {
   // 🌀 Reescreve links do conteúdo
   console.log("[Language Menu] Rewriting content links for:", currentLang);
 
-  document.querySelectorAll('#mw-content-text a[href^="/"]').forEach(function (link) {
+  //document.querySelectorAll('#mw-content-text a[href^="/"]').forEach(function (link) {
+  document.querySelectorAll('a[href^="/doc/"]').forEach(function (link) {
     if (link.classList.contains('lang-menu-link')) return; // ignora menu de idiomas
 
     var href = link.getAttribute('href');
